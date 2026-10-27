@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cyber Defence White Cell prototype</title>
+<style>
+:root{--bg:#f5f8f8;--pn:#fff;--tx:#12262b;--mut:#566d72;--ac:#0b7a75;--bd:#d6e0e1;--rd:#c8372d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1417;--pn:#152127;--tx:#e8f0f1;--mut:#93a8ab;--ac:#3cc6bd;--bd:#27393d;--rd:#ff7a6e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1417;--pn:#152127;--tx:#e8f0f1;--mut:#93a8ab;--ac:#3cc6bd;--bd:#27393d;--rd:#ff7a6e;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:1.8rem;line-height:1.1;letter-spacing:-.02em;margin:.1em 0 .3em}
+h2{font-size:1.1rem;margin:1.6em 0 .4em;padding-top:.6em;border-top:2px solid var(--ac)}
+.note{border-left:4px solid var(--ac);padding:4px 12px;color:var(--mut);font-size:.9rem}
+nav{display:flex;gap:18px;margin:16px 0 8px;border-bottom:1px solid var(--bd)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mut);font:inherit;font-weight:600;padding:8px 0;cursor:pointer}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:.8rem;color:var(--mut)}
+input,select{width:100%;padding:8px;border:1px solid var(--bd);border-radius:4px;background:var(--pn);color:var(--tx);font:inherit}
+.mut{color:var(--mut);font-size:.9rem}
+.ov{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:7px 10px 7px 0;border-bottom:1px solid var(--bd)}
+td:first-child{min-width:170px}
+.best{box-shadow:inset 0 -3px 0 var(--ac)}
+svg{width:100%;height:auto;margin-top:8px}
+svg line{stroke:var(--mut);stroke-opacity:.5;stroke-width:2}
+svg text{fill:var(--tx);font-size:10px}
+.nd{fill:var(--pn);stroke:var(--mut);stroke-width:2}
+.nd.ni{fill:var(--bd)}
+.nd.nr{stroke:var(--rd);stroke-width:4}
+#lg div{padding:3px 0;border-bottom:1px solid var(--bd);font-size:.88rem}
+pre{white-space:pre-wrap;background:var(--pn);border:1px solid var(--bd);padding:12px;font-size:.82rem;overflow-x:auto}
+.cp{font:inherit;font-weight:600;padding:8px 14px;border:0;background:var(--ac);color:#fff;border-radius:4px;cursor:pointer;margin-top:10px}
+ul{padding-left:1.2em}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Autonomous Cyber Defence White Cell</h1>
+<p class="note">Use Case #37, Team-070-BrendanEich. An independent prototype by Michael Krampah. It uses an abstract simulated network and assumed parameters. It contains no real systems, no exploit code and no client data, and makes no claims about real defences.</p>
+<nav><button id="t-demo">Demo</button><button id="t-writeup">Write-up</button><button id="t-readme">README</button></nav>
+
+<section id="demo">
+<p>In a cyber exercise the white cell is the neutral referee. Here it injects an attack into a simulated network, runs repeated exercises against three autonomous defence policies, enforces a guardrail and scores them.</p>
+<div class="g2">
+<div><label for="sc">Scenario injected by the white cell</label><select id="sc"></select></div>
+<div><label for="hd">Human approval delay (ticks)</label><input id="hd" type="number" value="4" min="1" max="20"></div>
+<div><label for="n">Exercises per policy</label><select id="n"><option>200</option><option selected>500</option><option>2000</option></select></div>
+<div><label for="seed">Random seed</label><input id="seed" type="number" value="42"></div>
+</div>
+<h2>Scorecard</h2>
+<div class="ov"><table><thead><tr><th>Measure<th>Conservative<th>Balanced<th>Aggressive</thead><tbody id="tb"></tbody></table></div>
+<p id="verdict"></p>
+<p class="mut">Conservative: a human approves every action. Balanced: acts alone on ordinary systems, asks a human for critical ones. Aggressive: acts alone everywhere. Score = 40% attacker failure, 25% uptime, 20% containment, 15% no guardrail breach.</p>
+<h2>Replay of exercise 1</h2>
+<div><label for="pol">Policy to replay</label><select id="pol"><option>Conservative</option><option selected>Balanced</option><option>Aggressive</option></select></div>
+<div id="map"></div>
+<p class="mut">Red ring: compromised at some point. Grey fill: isolated at some point. Larger circles are critical systems.</p>
+<div id="lg"></div>
+</section>
+
+<section id="writeup" hidden>
+<h2>1. Problem</h2>
+<p>Autonomous cyber defence is only useful if it can be trusted, and trust needs testing that is safe, repeatable and fair. In an exercise, the white cell is the neutral control team: it sets the scenario, injects events, enforces the rules, adjudicates what happens and scores the defenders. Can an automated white cell run repeatable exercises that score autonomous defence policies, including how much human oversight to keep, before they go near a real network?</p>
+<h2>2. Method</h2>
+<p>The world is an abstract network of 10 systems in four zones, where the Database and the Domain controller are critical. The white cell injects a starting foothold. A simple red agent then tries to spread one step per tick. Three blue policies defend, differing in how likely they are to detect an intrusion, how often they raise false alerts, and what they may do without a human (table below). An isolated system is offline for 5 ticks. The white cell logs every event, repeats the exercise many times per policy and scores each one with the stated weights. The rule it enforces is that an autonomous action must not wrongly take a healthy critical system offline.</p>
+<div class="ov"><table><thead><tr><th>Policy<th>Detects intrusion per tick<th>False alert per healthy system per tick<th>Who acts</thead><tbody id="pp"></tbody></table></div>
+<h2>3. Result</h2>
+<p id="res"></p>
+<h2>4. Limits</h2>
+<ul>
+<li><b>Assumed, not measured.</b> Detection rates, false alert rates, spread chances and system weights are invented. The output shows how the model behaves, not how real defences behave.</li>
+<li><b>Built-in conclusion risk.</b> The guardrail and the score weights are my choices, so the ranking partly reflects them. Change the approval delay to see how fragile it is.</li>
+<li><b>Toy attacker.</b> The red agent spreads at random. It is not a skilled adversary and does not model real attack techniques.</li>
+<li><b>Rule-based defenders.</b> The policies are fixed rules, not learned or LLM-driven agents. Human analysts are assumed to triage perfectly after the delay.</li>
+<li><b>Not validated.</b> Nothing has been compared with real incident timelines or with established open cyber-defence environments.</li>
+<li><b>No confidence intervals.</b> Small gaps between policies should not be trusted.</li>
+</ul>
+</section>
+
+<section id="readme" hidden>
+<p class="mut">Copy this into README.md in a GitHub repo, next to the HTML file.</p>
+<pre id="rd"># Autonomous Cyber Defence White Cell: prototype
+
+Use Case #37, Team-070-BrendanEich. Independent prototype by Michael Krampah.
+
+An automated white cell (the neutral referee of a cyber exercise) that runs repeatable simulated attacks against three autonomous defence policies, enforces a guardrail and scores them.
+Abstract simulation only. No real systems, no exploit code, no client data.
+
+## Run it
+Open the HTML file in any browser. No install, no server, no API keys.
+
+## What it does
+1. The white cell injects a scenario (a starting foothold) into an abstract 10-system network.
+2. A simple red agent spreads from system to system.
+3. Three blue policies defend: Conservative (a human approves every action), Balanced (automatic on ordinary systems, human approval on critical ones), Aggressive (automatic everywhere).
+4. The white cell logs every event and runs N exercises per policy.
+5. It scores each policy on attacker success, containment, mission uptime and guardrail breaches, and writes an after-action summary.
+6. Change the human approval delay to see the trade-off between oversight and speed.
+
+## Scoring
+score = 100 x (0.40 x (1 - attacker reached database) + 0.25 x uptime + 0.20 x contained + 0.15 x (1 - guardrail breaches, capped at 1))
+A guardrail breach is an autonomous action that takes a healthy critical system offline.
+The weights are assumptions. Change them in the HTML file.
+
+## Assumptions
+Detection rates, false alert rates, spread probabilities, system weights and the 5-tick isolation time are illustrative, not measured.
+
+## Not done yet
+- [ ] Map red behaviour to MITRE ATT&amp;CK tactics
+- [ ] Learned or LLM-driven blue agents scored by the same white cell
+- [ ] Compare against an open cyber-defence gym and real incident timelines
+- [ ] More scenarios, confidence intervals, adjustable weights in the interface
+
+## Author
+Michael Krampah, michaelkrampah984@gmail.com, https://github.com/mkrampah</pre>
+<button class="cp" id="cp">Copy README.md</button>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id),pc=x=>(100*x).toFixed(0)+"%",p1=x=>(100*x).toFixed(1)+"%";
+const ND=[["Web server",2,0],["Mail gateway",1,0],["Workstation 1",1,0],["Workstation 2",1,0],["Workstation 3",1,0],["File server",2,0],["App server",3,0],["Database",5,1],["Domain controller",4,1],["Admin workstation",1,0]];
+const ED=[[0,6],[1,2],[1,3],[2,3],[3,4],[2,5],[4,5],[5,6],[6,7],[5,8],[8,9],[9,7]];
+const XY=[[50,40],[50,150],[160,40],[160,110],[160,180],[280,110],[280,40],[400,40],[280,180],[400,180]];
+const AJ=ND.map((_,i)=>ED.filter(e=>e.includes(i)).map(e=>e[0]==i?e[1]:e[0]));
+const PO={Conservative:{dt:.1,fp:.002,m:0},Balanced:{dt:.22,fp:.01,m:1},Aggressive:{dt:.35,fp:.03,m:2}};
+const WHO=["A human approves every action","Automatic on ordinary systems, a human approves critical ones","Automatic everywhere"];
+const SC={"Phishing email":1,"Exposed web service":0,"Insider on Workstation 3":4};
+const TW=ND.reduce((a,x)=>a+x[1],0),T=40;
+function rng(a){return()=>{a|=0;a=a+1831565813|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function ex(P,st,hd,rr,rb,lg){
+ const n=ND.length,red=Array(n).fill(0),off=Array(n).fill(0),pd=Array(n).fill(0),ever=Array(n).fill(0),iso=Array(n).fill(0),task=[];
+ let obj=0,ttd=T,tc=T,up=0,fi=0,fc=0;
+ const L=(t,m)=>lg&&lg.push("t"+t+": "+m);
+ const cut=(i,t,how)=>{const h=!red[i];if(h){fi++;if(ND[i][2])fc++}red[i]=0;off[i]=5;pd[i]=0;iso[i]=1;L(t,"Blue isolates "+ND[i][0]+" ("+how+")"+(h?", but it was healthy":""))};
+ red[st]=1;ever[st]=1;L(0,"White cell injects a foothold on "+ND[st][0]);
+ for(let t=0;t<T;t++){
+  task.forEach(k=>{if(k.at==t){pd[k.i]=0;if(red[k.i]&&!off[k.i])cut(k.i,t,"human approved");else L(t,"Analyst dismisses the alert on "+ND[k.i][0])}});
+  if(t>0){const f=[];for(let i=0;i<n;i++)if(red[i]&&!off[i])AJ[i].forEach(j=>{if(!red[j]&&!off[j])f.push(j)});
+   if(f.length){const j=f[Math.floor(rr()*f.length)];if(rr()<(ND[j][2]?.2:.3)){red[j]=1;ever[j]=1;L(t,"Red spreads to "+ND[j][0]);if(j==7){obj=1;L(t,"Objective reached: Database compromised")}}}}
+  for(let i=0;i<n;i++){if(off[i]||pd[i])continue;
+   const real=red[i],hit=real?rb()<P.dt:rb()<P.fp;
+   if(!hit)continue;
+   if(real&&ttd==T)ttd=t;
+   L(t,"Alert on "+ND[i][0]+(real?" (real)":" (false)"));
+   if(P.m==2||(P.m==1&&!ND[i][2]))cut(i,t,"automatic");else{pd[i]=1;task.push({at:t+hd,i})}
+  }
+  if(!red.some(x=>x)&&tc==T)tc=t;
+  up+=ND.reduce((a,x,i)=>a+(off[i]?0:x[1]),0)/TW;
+  for(let i=0;i<n;i++)if(off[i]>0)off[i]--;
+ }
+ return{obj,ttd,tc,up:up/T,fi,fc,ever,iso}}
+function agg(P,st,hd,N,seed){
+ const a=[];for(let k=0;k<N;k++)a.push(ex(P,st,hd,rng(seed*7919+k),rng(seed*104729+k+99)));
+ const m=f=>a.reduce((s,x)=>s+f(x),0)/N,td=a.filter(x=>x.ttd<T).map(x=>x.ttd).sort((x,y)=>x-y);
+ return{obj:m(x=>x.obj),con:m(x=>x.tc<T?1:0),up:m(x=>x.up),fi:m(x=>x.fi),fc:m(x=>x.fc),dt:td.length?td[td.length>>1]:null}}
+function mp(q){return'<svg viewBox="0 0 470 215" role="img" aria-label="Network map of the replayed exercise">'+ED.map(([a,b])=>`<line x1="${XY[a][0]}" y1="${XY[a][1]}" x2="${XY[b][0]}" y2="${XY[b][1]}"/>`).join("")+ND.map((x,i)=>`<circle cx="${XY[i][0]}" cy="${XY[i][1]}" r="${x[2]?16:12}" class="nd${q.iso[i]?" ni":""}${q.ever[i]?" nr":""}"/><text x="${XY[i][0]}" y="${XY[i][1]+(x[2]?30:26)}" text-anchor="middle">${x[0]}</text>`).join("")+"</svg>"}
+function run(){
+ const N=+$("n").value,seed=Math.floor(+$("seed").value)||1,hd=Math.max(1,Math.floor(+$("hd").value)||1),sc=$("sc").value,st=SC[sc],K=Object.keys(PO),M={},S={};
+ K.forEach(k=>{const g=agg(PO[k],st,hd,N,seed);M[k]=g;S[k]=100*(.4*(1-g.obj)+.25*g.up+.2*g.con+.15*(1-Math.min(1,g.fc)))});
+ const b=K.reduce((x,y)=>S[y]>S[x]?y:x),lo=K.reduce((x,y)=>M[y].obj<M[x].obj?y:x),hi=K.reduce((x,y)=>M[y].up>M[x].up?y:x);
+ const R=[["Score (out of 100)",k=>S[k].toFixed(0)],["Attacker reached the database",k=>pc(M[k].obj)],["Attack fully contained within 40 ticks",k=>pc(M[k].con)],["Median ticks to detect",k=>M[k].dt==null?"never":M[k].dt],["Mission uptime",k=>p1(M[k].up)],["Healthy systems wrongly isolated per exercise",k=>M[k].fi.toFixed(1)],["Critical systems wrongly isolated per exercise (guardrail breaches)",k=>M[k].fc.toFixed(1)]];
+ $("tb").innerHTML=R.map((r,j)=>"<tr><td>"+r[0]+K.map(k=>`<td${j==0&&k==b?" class=best":""}>${j==0?"<b>"+r[1](k)+"</b>":r[1](k)}`).join("")).join("");
+ const bad=K.filter(k=>M[k].fc>=.05).map(k=>k+" wrongly took a critical system offline "+M[k].fc.toFixed(1)+" times per exercise");
+ const v=b+" scores highest ("+S[b].toFixed(0)+" out of 100). Lowest attacker success: "+lo+" ("+pc(M[lo].obj)+"). Highest mission uptime: "+hi+" ("+p1(M[hi].up)+"). "+(bad.length?"Guardrail breaches: "+bad.join("; ")+".":"No policy breached the guardrail.");
+ $("verdict").textContent=v;
+ $("res").textContent="In this run (scenario: "+sc+", "+N.toLocaleString("en-US")+" exercises per policy, human approval delay "+hd+" ticks, seed "+seed+"), "+v+" This demonstrates what the white cell can show under assumed inputs. It is not evidence about real defences or real attackers.";
+ const lg=[],q=ex(PO[$("pol").value],st,hd,rng(seed*7919),rng(seed*104729+99),lg);
+ $("map").innerHTML=mp(q);
+ $("lg").innerHTML=lg.slice(0,60).map(x=>`<div>${x}</div>`).join("")+(lg.length>60?`<div class="mut">${lg.length-60} more events not shown.</div>`:"");
+}
+$("sc").innerHTML=Object.keys(SC).map(k=>`<option>${k}</option>`).join("");
+$("pp").innerHTML=Object.entries(PO).map(([k,p])=>`<tr><td>${k}<td>${p1(p.dt)}<td>${p1(p.fp)}<td>${WHO[p.m]}`).join("");
+const T3=["demo","writeup","readme"];
+function show(t){if(!T3.includes(t))t="demo";T3.forEach(x=>{$(x).hidden=x!=t;$("t-"+x).classList.toggle("on",x==t)})}
+T3.forEach(x=>$("t-"+x).onclick=()=>show(x));
+document.querySelectorAll("input,select").forEach(e=>e.oninput=run);
+$("cp").onclick=async()=>{const t=$("rd").textContent;try{await navigator.clipboard.writeText(t);$("cp").textContent="Copied"}catch(e){const g=document.createRange();g.selectNodeContents($("rd"));const s=getSelection();s.removeAllRanges();s.addRange(g);$("cp").textContent="Selected, now press copy"}};
+show(location.hash.slice(1));run();
+</script>
+</body>
+</html>
